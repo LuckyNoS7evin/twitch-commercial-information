@@ -34,8 +34,7 @@ namespace SimpleSignalRService
                     builder.AllowAnyHeader()
                            .AllowAnyMethod()
                            .AllowCredentials()
-                           .SetIsOriginAllowedToAllowWildcardSubdomains()
-                           .WithOrigins("http://localhost:8080"));
+                           .AllowAnyOrigin();
             });
             services.AddSignalR();
             services.AddControllers();
