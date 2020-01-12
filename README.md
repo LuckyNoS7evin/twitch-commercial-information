@@ -4,6 +4,10 @@ System to display preroll free time left as an overlay within OBS or your select
 
 There is a small server based element which is a dotnet core 3.1 signalR server. If you do not want to use the admin page there are options to just send a message to the signalR server. 
 
+## Known Issues
+
+1. Doesn't take into account accumulated time (max 1 hour), if you run an advert with for example 50seconds left of your previous preroll time this is wiped in the overlay but still taken into account by Twitch.
+
 ## Future plans
 
 1.  API so instead of sending message via signalR it can be done RESTfully. This has the advatange of being able to integrate into more systems as signalR is not everywhere
