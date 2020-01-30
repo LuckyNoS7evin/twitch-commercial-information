@@ -1,22 +1,22 @@
 <template>
-  <div class="timer">
-    <h1 v-if="prerollFree && !adRunning">Preroll Free Time: {{timeLeft}}</h1>
-    <h1 v-if="adRunning">Ad Running: {{adTimeLeft}}</h1>
-    <h1 v-if="!prerollFree && !adRunning">Prerolls Active</h1>
-  </div>
+  <overlay/>
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
+import { mapActions } from 'vuex'
+import Overlay from '@/components/Overlay'
 
 export default {
-  computed: {
-    ...mapGetters([
-      'timeLeft',
-      'adTimeLeft',
-      'adRunning',
-      'prerollFree'
+  components: {
+    Overlay
+  },
+  methods: {
+    ...mapActions([
+      'loadOverlay'
     ])
+  },
+  mounted () {
+    this.loadOverlay(this.$route.params.login)
   }
 }
 </script>

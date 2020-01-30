@@ -1,41 +1,85 @@
 <template>
-  <div class="home">
-    <button @click="runAd(30)">Run 30s ad</button>
-    <button @click="runAd(90)">Run 90s ad</button>
-    <button @click="fakeAd(30)">Run fake 30s ad</button>
-  </div>
+<v-container class="fill-height" fluid>
+   <v-row align="center" justify="center">
+    <v-col cols="12" align="center" justify="center">
+      <overlay />
+    </v-col>
+  </v-row>
+   <v-row align="center" justify="center">
+    <v-col cols="12" align="center" justify="center">
+      <v-alert>
+        Your overlay Url is: {{overlayUrl}}
+      </v-alert>
+    </v-col>
+  </v-row>
+  <v-row align="center" justify="center">
+    <v-col cols="6" align="center" justify="center">
+      <v-btn @click="runAd(30)" class="ad-btn">Run 30-Second<br/> Ad Break</v-btn>
+    </v-col>
+    <v-col cols="6" align="center" justify="center">
+      <v-btn @click="runAd(60)" class="ad-btn">Run 60-Second<br/> Ad Break</v-btn>
+    </v-col>
+  </v-row>
+  <v-row align="center" justify="center">
+    <v-col cols="6" align="center" justify="center">
+      <v-btn @click="runAd(90)" class="ad-btn">Run 90-Second<br/> Ad Break</v-btn>
+    </v-col>
+    <v-col cols="6" align="center" justify="center">
+      <v-btn @click="runAd(120)" class="ad-btn">Run 120-Second<br/> Ad Break</v-btn>
+    </v-col>
+  </v-row>
+  <v-row align="center" justify="center">
+    <v-col cols="6" align="center" justify="center">
+      <v-btn @click="runAd(150)" class="ad-btn">Run 150-Second<br/> Ad Break</v-btn>
+    </v-col>
+    <v-col cols="6" align="center" justify="center">
+      <v-btn @click="runAd(180)" class="ad-btn">Run 180-Second<br/> Ad Break</v-btn>
+    </v-col>
+  </v-row>
+</v-container>
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapGetters, mapActions } from 'vuex'
+import Overlay from '@/components/Overlay'
 
 export default {
   name: 'Settings',
+  components: {
+    Overlay
+  },
   computed: {
-    ...mapState([
-      'signalRClient',
-      'chatClient',
-      'channel'
+    ...mapGetters([
+      'overlayUrl'
     ])
   },
   methods: {
-    fakeAd (time) {
-      this.signalRClient.invoke('SendMessage', this.channel, time)
-      // .catch(function (err) {
-      //   return console.error(err.toString())
-      // })
-    },
-    runAd (time) {
-      this.chatClient.runCommercial(this.channel, time)
-        .then(_ => {
-          // console.log(`Comercial started ${time}`)
-          return this.signalRClient.invoke('SendMessage', this.channel, time)
-          // .catch(function (err) {
-          //   return console.error(err.toString())
-          // })
-        })
-        // .catch(error => console.error(error))
-    }
+    ...mapActions([
+      'loadApplication',
+      'runAd'
+    ])
+  },
+  mounted () {
+    this.loadApplication()
   }
 }
 </script>
+
+<style scoped>
+.timer {
+  /* width: fit-content; */
+  height: 100px;
+  background-color: #9147ff;
+  border-radius: 20px;
+  line-height: 100px;
+}
+
+.ad-btn {
+  background-color: #9147ff !important;
+  border-color: #9147ff !important;
+  height: 150px !important;
+  line-height: 150px !important;
+  min-width:150px !important;
+  border-radius: 20px !important;
+}
+</style>

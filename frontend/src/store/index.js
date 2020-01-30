@@ -1,6 +1,8 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 
+import mainAuth from '@/auth'
+
 import ChatClient from 'twitch-chat-client'
 import TwitchClient from 'twitch'
 import { HubConnectionBuilder } from '@aspnet/signalr'
@@ -12,13 +14,11 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
-    channelId: process.env.VUE_APP_CHANNEL_ID,
-    channel: process.env.VUE_APP_CHANNEL_NAME,
+    overlayUrl: '',
+    channel: null,
     client: null,
     chatClient: null,
     clientId: process.env.VUE_APP_CLIENT_ID,
-    clientSecret: process.env.VUE_APP_SECRET,
-    clientAuthToken: process.env.VUE_APP_AUTH_TOKEN,
     signalRServer: process.env.VUE_APP_SIGNALR_SERVER,
     signalRClient: null,
     adLastRun: Date.now(),
@@ -28,6 +28,9 @@ export default new Vuex.Store({
     adRunningDifference: 0
   },
   getters: {
+    overlayUrl (state) {
+      return state.overlayUrl
+    },
     adRunning (state) {
       return state.adRunningDifference > 0
     },
@@ -54,6 +57,12 @@ export default new Vuex.Store({
     }
   },
   mutations: {
+    channel (state, channel) {
+      state.channel = channel
+    },
+    overlayUrl (state, overlayUrl) {
+      state.overlayUrl = overlayUrl
+    },
     client (state, client) {
       state.client = client
     },
@@ -80,9 +89,14 @@ export default new Vuex.Store({
     }
   },
   actions: {
-    async loadApplication (context) {
+    runAd (context, time) {
+      context.state.chatClient.runCommercial(context.state.channel, time)
+        .then(_ => {
+          return context.state.signalRClient.invoke('SendMessage', time)
+        })
+    },
+    loadOverlay (context, channelId) {
       momentDurationFormatSetup(moment)
-
       setInterval(() => {
         let date = Date.now()
         let timeDifference = (context.state.adLastRun + context.state.prerollFreeDuration + context.state.adDuration) - date
@@ -94,21 +108,11 @@ export default new Vuex.Store({
         context.commit('adRunningDifference', adRunningDifference)
       }, 1000)
 
-      let client = await TwitchClient.withCredentials(context.state.clientId, context.state.clientAuthToken)
-      let chatClient = await ChatClient.forTwitchClient(client, { webSocket: true })
-      chatClient.connect()
-        .then(() => chatClient.waitForRegistration())
-        .then(() => chatClient.join(context.state.channel))
-        .then(() => {
-          context.commit('chatClient', chatClient)
-        })
+      let signalRClient = new HubConnectionBuilder()
+        .withUrl(`${context.state.signalRServer}`)
+        .build()
 
-      context.commit('client', client)
-
-      let signalRClient = new HubConnectionBuilder().withUrl(context.state.signalRServer).build()
-      signalRClient.on('ReceiveMessage', (channel, time) => {
-        // console.log({ channel, time })
-
+      signalRClient.on('ReceiveMessage', (time) => {
         let duration = 0
         switch (time) {
           case 30: {
@@ -130,12 +134,68 @@ export default new Vuex.Store({
       })
       signalRClient.start()
         .then(() => {
-          // console.log('connected')
+          signalRClient.send('listen', channelId)
           context.commit('signalRClient', signalRClient)
         })
-      // .catch(function (err) {
-      //   return console.error(err.toString())
-      // })
+    },
+    async loadApplication (context) {
+      momentDurationFormatSetup(moment)
+
+      setInterval(() => {
+        let date = Date.now()
+        let timeDifference = (context.state.adLastRun + context.state.prerollFreeDuration + context.state.adDuration) - date
+        let adRunningDifference = (context.state.adLastRun + context.state.adDuration) - date
+        if (timeDifference > context.state.prerollFreeDuration) {
+          timeDifference = context.state.prerollFreeDuration
+        }
+        context.commit('timeDifference', timeDifference)
+        context.commit('adRunningDifference', adRunningDifference)
+      }, 1000)
+
+      let client = await TwitchClient.withCredentials(context.state.clientId, mainAuth.user.access_token)
+
+      let user = await client.helix.users.getMe(false)
+      const loco = window.location
+      context.commit('overlayUrl', `${loco.protocol}//${loco.host}${process.env.BASE_URL}overlay/${user.id}`)
+      context.commit('channel', user.name)
+      let chatClient = await ChatClient.forTwitchClient(client, { webSocket: true })
+      chatClient.connect()
+        .then(() => chatClient.waitForRegistration())
+        .then(() => chatClient.join(user.name))
+        .then(() => {
+          console.log('here')
+          chatClient.say(user.name, 'hey')
+          context.commit('chatClient', chatClient)
+        })
+
+      context.commit('client', client)
+
+      let signalRClient = new HubConnectionBuilder()
+        .withUrl(`${context.state.signalRServer}`, {
+          accessTokenFactory: () => mainAuth.user.id_token
+        })
+        .build()
+      signalRClient.on('ReceiveMessage', (time) => {
+        let duration = 0
+        switch (time) {
+          case 30: {
+            duration = 10 * 60 * 1000
+            break
+          }
+          case 60: {
+            duration = 20 * 60 * 1000
+            break
+          }
+          default: {
+            duration = 30 * 60 * 1000
+            break
+          }
+        }
+        context.commit('adDuration', time * 1000)
+        context.commit('adLastRun', Date.now())
+        context.commit('prerollFreeDuration', duration)
+      })
+      signalRClient.start().then(() => context.commit('signalRClient', signalRClient))
     }
   }
 })

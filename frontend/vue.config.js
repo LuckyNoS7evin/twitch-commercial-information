@@ -1,4 +1,6 @@
-
 module.exports = {
-  // publicPath: '.'
+  'transpileDependencies': [
+    'vuetify',
+    'vue-oidc-client'
+  ]
 }

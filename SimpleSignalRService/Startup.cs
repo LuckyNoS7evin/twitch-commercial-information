@@ -1,15 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using SimpleSignalRService.Hubs;
 
 namespace SimpleSignalRService
@@ -27,14 +24,46 @@ namespace SimpleSignalRService
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            IConfigurationManager<OpenIdConnectConfiguration> configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>($"https://id.twitch.tv/oauth2/.well-known/openid-configuration", new OpenIdConnectConfigurationRetriever());
+            OpenIdConnectConfiguration openIdConfig = configurationManager.GetConfigurationAsync(CancellationToken.None).Result;
+
+            services.AddAuthentication(cfg =>
+            {
+                cfg.DefaultAuthenticateScheme = "Twitch";
+                cfg.DefaultChallengeScheme = "Twitch";
+            })
+            .AddJwtBearer("Twitch", cfg =>
+            {
+                cfg.TokenValidationParameters = new TokenValidationParameters()
+                {
+                    ValidateLifetime = false,
+                    LifetimeValidator = new LifetimeValidator((notBefore, expires, token, validationParams) =>
+                    {
+                        return true;
+                    }),
+                    ValidateIssuer = true,
+                    ValidIssuer = "https://id.twitch.tv/oauth2",
+                    ValidateAudience = true,
+                    ValidAudience = Configuration["Authorization:ClientId"],
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKeys = openIdConfig.SigningKeys,
+                    NameClaimType = "preferred_username"
+                };
+
+
+            });
             services.AddCors(options =>
             {
                 options.AddPolicy(MyAllowSpecificOrigins,
                 builder =>
-                    builder.AllowAnyHeader()
-                           .AllowAnyMethod()
-                           .AllowCredentials()
-                           .AllowAnyOrigin();
+                {
+                    builder
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials()
+                        .SetIsOriginAllowedToAllowWildcardSubdomains()
+                        .WithOrigins("http://localhost:8080");
+                });
             });
             services.AddSignalR();
             services.AddControllers();
@@ -48,11 +77,9 @@ namespace SimpleSignalRService
                 app.UseDeveloperExceptionPage();
             }
 
-            // app.UseHttpsRedirection();
-
             app.UseRouting();
-
             app.UseCors(MyAllowSpecificOrigins);
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
